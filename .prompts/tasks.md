@@ -41,7 +41,7 @@
   - (entity_type, confidence_score) 
   - (from_entity, relation_type)
 - [x] Implement table partitioning
-- [x] Add materialized views
+- [x] Add materialized views ✓
 
 ### Connection Management [2.2] ✓
 - [x] Connection pooling with:
@@ -95,9 +95,9 @@
 - [x] Add error categories
 - [x] Add recovery strategies
 
-### Monitoring [5.2]
-- [ ] Add performance metrics
-- [ ] Add health checks
+### Monitoring [5.2] ✓
+- [x] Add performance metrics
+- [x] Add health checks
 
 ### Testing [5.3]
 - [ ] Add test suite

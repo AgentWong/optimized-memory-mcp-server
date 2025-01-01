@@ -1,7 +1,9 @@
 import asyncio
 import aiosqlite
 import logging
+import time
 from typing import AsyncGenerator, List, Optional, Dict, Any, Tuple, Set
+from ...monitoring.metrics import MetricsCollector, HealthCheck
 from contextlib import asynccontextmanager
 import time
 from datetime import datetime, timedelta
@@ -22,11 +24,14 @@ class SQLiteConnectionPool:
         echo: bool = False,
         cache_ttl: int = 300  # 5 minutes default TTL
     ) -> None:
+        """Initialize connection pool with metrics collection."""
         self.db_path: str = db_path
         self.echo: bool = echo
         self._pool_size: int = pool_size
         self._pool: List[aiosqlite.Connection] = []
         self._pool_semaphore: asyncio.Semaphore = asyncio.Semaphore(pool_size)
+        self.metrics = MetricsCollector()
+        self.health_check = HealthCheck(self)
         self._prepared_statements: Dict[str, aiosqlite.Statement] = {}
         self._query_cache: Dict[str, Tuple[Any, float]] = {}  # (result, timestamp)
         self._cache_ttl = cache_ttl
@@ -130,10 +135,15 @@ class SQLiteConnectionPool:
 
     @asynccontextmanager
     async def get_connection(self) -> AsyncGenerator[aiosqlite.Connection, None]:
-        """Get a connection from the pool or create a new one."""
+        """Get a connection from the pool or create a new one with metrics tracking."""
         await self._cleanup_caches()
         
-        async with self._pool_semaphore:
+        try:
+            async with self._pool_semaphore:
+                self.metrics.update_connection_metrics(
+                    self._pool_size - self._pool_semaphore._value,
+                    self._pool_size
+                )
             conn = None
             try:
                 if not self._pool:
@@ -206,14 +216,18 @@ class SQLiteConnectionPool:
         conn: aiosqlite.Connection,
         sql: str,
         params: tuple = None,
-        ttl: int = None
+        ttl: int = None,
+        query_type: str = "unknown"
     ) -> List[Dict[str, Any]]:
-        """Execute a query with caching."""
+        """Execute a query with caching and metrics."""
+        start_time = time.time()
         cache_key = self._get_cache_key(sql, params)
         
         # Check cache first
         cached_result = self.get_cached_query(cache_key)
         if cached_result is not None:
+            duration = time.time() - start_time
+            self.metrics.record_query(query_type, duration, cache_hit=True)
             return cached_result
 
         # Prepare and execute
@@ -226,6 +240,8 @@ class SQLiteConnectionPool:
         rows = await cursor.fetchall()
         result = [dict(row) for row in rows]
         
-        # Cache the result
+        # Cache the result and record metrics
         self.cache_query(cache_key, result, ttl)
+        duration = time.time() - start_time
+        self.metrics.record_query(query_type, duration, cache_hit=False)
         return result
