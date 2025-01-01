@@ -73,7 +73,7 @@ auto-commits: false
 
 ## Specify lint commands to run for different languages, eg: "python: flake8 --select=..." (can be used multiple times)
 lint-cmd:
-  - "terraform: tflint"
+  - "python: flake8 ."
 ## Specify multiple values like this:
 #lint-cmd:
 #  - xxx
