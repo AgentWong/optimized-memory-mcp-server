@@ -1,31 +1,51 @@
 # Python Module Organization Template
 
-You are organizing Python code with these fundamental requirements:
-1. Script files must not exceed 250 lines of code
-2. [Describe additional organizational requirements]
+## Critical Requirements
 
-Note: The 250-line limit is a hard requirement. If your organization would exceed this limit, you must split the code into multiple files and explain the modular structure.
+1. This template is for ORGANIZATIONAL changes only. You must NOT:
+   - Add new features or functionality
+   - Modify existing business logic
+   - Change the behavior of any code
+   - Introduce new dependencies unless absolutely required for organization
+
+2. Script files must not exceed 250 lines of code
+   - This is a hard requirement
+   - If reorganization would exceed this limit, the code must be split into multiple files
+   - When splitting files, maintain existing functionality exactly as is
 
 Current code structure:
 [Describe or show current organization]
 
-Please provide:
-1. Module Structure:
-   - File organization
-   - Module dependencies
-   - Interface definitions
+## Analysis Requirements
 
-2. Code Segmentation:
-   - Function grouping
-   - Class organization
-   - Utility separation
+Please provide a detailed analysis and recommendations in the following format:
 
-3. Implementation Details:
-   - Import organization
-   - Code layout
-   - Documentation structure
+1. Module Structure Assessment:
+   - Current file organization evaluation
+   - Module dependency analysis
+   - Interface clarity review
+   - Identification of any violations of the 250-line limit
 
-4. Migration Plan:
-   - Steps to reorganize
-   - Dependency management
-   - Testing strategy
+2. Code Segmentation Plan:
+   - Proposed logical groupings of functions and classes
+   - Clear rationale for any proposed file splits
+   - Utility code identification and separation
+   - Preservation of existing functionality
+
+3. Implementation Approach:
+   - Detailed steps for reorganization
+   - Import statement restructuring
+   - Documentation updates
+   - Verification steps to ensure no functional changes
+
+4. Risk Mitigation:
+   - Potential impact assessment
+   - Testing strategy for reorganization
+   - Rollback plan if needed
+   - Dependency management considerations
+
+Remember:
+- Focus exclusively on organization and structure
+- Maintain existing functionality exactly
+- Do not suggest feature improvements or enhancements
+- Any changes must be purely organizational in nature
