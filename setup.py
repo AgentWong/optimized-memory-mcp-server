@@ -7,6 +7,7 @@ setup(
     install_requires=[
         "aiofiles>=23.2.1",
         "mcp>=1.1.2",
+        "aiosqlite>=0.20.0",
     ],
     python_requires=">=3.12",
 )
