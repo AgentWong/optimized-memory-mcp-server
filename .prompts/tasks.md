@@ -70,9 +70,9 @@
 
 ## Context Features [4.0]
 
-### Conversation Context [4.1] (In Progress)
+### Conversation Context [4.1] ✓
 - [x] Add conversation tracking
-- [ ] Implement relevance scoring
+- [x] Implement relevance scoring
 
 ### Technical Context [4.2]
 - [ ] Add code snippet storage

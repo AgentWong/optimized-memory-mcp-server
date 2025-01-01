@@ -222,6 +222,50 @@ SCHEMA_STATEMENTS = [
         UPDATE ansible_playbooks SET last_updated = CURRENT_TIMESTAMP
         WHERE id = NEW.id;
     END
+    """,
+
+    # Conversations table
+    """
+    CREATE TABLE IF NOT EXISTS conversations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT,
+        start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_message_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        metadata JSON,
+        context_entities TEXT,  -- Comma-separated list of entity names
+        relevance_score FLOAT DEFAULT 1.0 CHECK (relevance_score >= 0.0 AND relevance_score <= 1.0)
+    )
+    """,
+
+    # Messages table
+    """
+    CREATE TABLE IF NOT EXISTS conversation_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id INTEGER NOT NULL,
+        message_type TEXT NOT NULL,  -- 'user', 'assistant', 'system'
+        content TEXT NOT NULL,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        metadata JSON,
+        entities_mentioned TEXT,  -- Comma-separated list of entity names
+        relevance_score FLOAT DEFAULT 1.0 CHECK (relevance_score >= 0.0 AND relevance_score <= 1.0),
+        FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+    )
+    """,
+
+    # Add indices
+    "CREATE INDEX IF NOT EXISTS idx_conversations_time ON conversations(last_message_time)",
+    "CREATE INDEX IF NOT EXISTS idx_messages_conversation ON conversation_messages(conversation_id)",
+    "CREATE INDEX IF NOT EXISTS idx_messages_type ON conversation_messages(message_type)",
+
+    # Add trigger for last_message_time
+    """
+    CREATE TRIGGER IF NOT EXISTS update_conversation_last_message
+    AFTER INSERT ON conversation_messages
+    BEGIN
+        UPDATE conversations 
+        SET last_message_time = NEW.timestamp
+        WHERE id = NEW.conversation_id;
+    END
     """
 ]
 
