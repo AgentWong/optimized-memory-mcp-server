@@ -357,6 +357,188 @@ SCHEMA_STATEMENTS = [
             occurrence_count = occurrence_count + 1
         WHERE id = NEW.pattern_id;
     END
+    """,
+
+    # Entity Changes table for temporal tracking
+    """
+    CREATE TABLE IF NOT EXISTS entity_changes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_name TEXT NOT NULL,
+        changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        change_type TEXT NOT NULL,  -- 'create', 'update', 'delete'
+        entity_state JSON NOT NULL,  -- Complete entity state at this point
+        changed_by TEXT,  -- Optional user/process that made the change
+        FOREIGN KEY (entity_name) REFERENCES entities(name) ON DELETE CASCADE
+    )
+    """,
+
+    # Relation Changes table for temporal tracking
+    """
+    CREATE TABLE IF NOT EXISTS relation_changes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        from_entity TEXT NOT NULL,
+        to_entity TEXT NOT NULL,
+        relation_type TEXT NOT NULL,
+        changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        change_type TEXT NOT NULL,  -- 'create', 'update', 'delete'
+        relation_state JSON NOT NULL,  -- Complete relation state at this point
+        changed_by TEXT,  -- Optional user/process that made the change
+        FOREIGN KEY (from_entity) REFERENCES entities(name) ON DELETE CASCADE,
+        FOREIGN KEY (to_entity) REFERENCES entities(name) ON DELETE CASCADE
+    )
+    """,
+
+    # Temporal indices
+    "CREATE INDEX IF NOT EXISTS idx_entity_changes_name ON entity_changes(entity_name)",
+    "CREATE INDEX IF NOT EXISTS idx_entity_changes_time ON entity_changes(changed_at)",
+    "CREATE INDEX IF NOT EXISTS idx_entity_changes_type ON entity_changes(change_type)",
+    "CREATE INDEX IF NOT EXISTS idx_relation_changes_entities ON relation_changes(from_entity, to_entity)",
+    "CREATE INDEX IF NOT EXISTS idx_relation_changes_time ON relation_changes(changed_at)",
+    "CREATE INDEX IF NOT EXISTS idx_relation_changes_type ON relation_changes(change_type)",
+
+    # Temporal change tracking triggers
+    """
+    CREATE TRIGGER IF NOT EXISTS track_entity_changes
+    AFTER UPDATE ON entities
+    BEGIN
+        INSERT INTO entity_changes (
+            entity_name, change_type, entity_state
+        )
+        VALUES (
+            NEW.name,
+            'update',
+            json_object(
+                'name', NEW.name,
+                'entity_type', NEW.entity_type,
+                'observations', NEW.observations,
+                'confidence_score', NEW.confidence_score,
+                'context_source', NEW.context_source,
+                'metadata', NEW.metadata
+            )
+        );
+    END
+    """,
+
+    """
+    CREATE TRIGGER IF NOT EXISTS track_entity_creation
+    AFTER INSERT ON entities
+    BEGIN
+        INSERT INTO entity_changes (
+            entity_name, change_type, entity_state
+        )
+        VALUES (
+            NEW.name,
+            'create',
+            json_object(
+                'name', NEW.name,
+                'entity_type', NEW.entity_type,
+                'observations', NEW.observations,
+                'confidence_score', NEW.confidence_score,
+                'context_source', NEW.context_source,
+                'metadata', NEW.metadata
+            )
+        );
+    END
+    """,
+
+    """
+    CREATE TRIGGER IF NOT EXISTS track_entity_deletion
+    BEFORE DELETE ON entities
+    BEGIN
+        INSERT INTO entity_changes (
+            entity_name, change_type, entity_state
+        )
+        VALUES (
+            OLD.name,
+            'delete',
+            json_object(
+                'name', OLD.name,
+                'entity_type', OLD.entity_type,
+                'observations', OLD.observations,
+                'confidence_score', OLD.confidence_score,
+                'context_source', OLD.context_source,
+                'metadata', OLD.metadata
+            )
+        );
+    END
+    """,
+
+    """
+    CREATE TRIGGER IF NOT EXISTS track_relation_changes
+    AFTER UPDATE ON relations
+    BEGIN
+        INSERT INTO relation_changes (
+            from_entity, to_entity, relation_type,
+            change_type, relation_state
+        )
+        VALUES (
+            NEW.from_entity,
+            NEW.to_entity,
+            NEW.relation_type,
+            'update',
+            json_object(
+                'from_entity', NEW.from_entity,
+                'to_entity', NEW.to_entity,
+                'relation_type', NEW.relation_type,
+                'valid_from', NEW.valid_from,
+                'valid_until', NEW.valid_until,
+                'confidence_score', NEW.confidence_score,
+                'context_source', NEW.context_source
+            )
+        );
+    END
+    """,
+
+    """
+    CREATE TRIGGER IF NOT EXISTS track_relation_creation
+    AFTER INSERT ON relations
+    BEGIN
+        INSERT INTO relation_changes (
+            from_entity, to_entity, relation_type,
+            change_type, relation_state
+        )
+        VALUES (
+            NEW.from_entity,
+            NEW.to_entity,
+            NEW.relation_type,
+            'create',
+            json_object(
+                'from_entity', NEW.from_entity,
+                'to_entity', NEW.to_entity,
+                'relation_type', NEW.relation_type,
+                'valid_from', NEW.valid_from,
+                'valid_until', NEW.valid_until,
+                'confidence_score', NEW.confidence_score,
+                'context_source', NEW.context_source
+            )
+        );
+    END
+    """,
+
+    """
+    CREATE TRIGGER IF NOT EXISTS track_relation_deletion
+    BEFORE DELETE ON relations
+    BEGIN
+        INSERT INTO relation_changes (
+            from_entity, to_entity, relation_type,
+            change_type, relation_state
+        )
+        VALUES (
+            OLD.from_entity,
+            OLD.to_entity,
+            OLD.relation_type,
+            'delete',
+            json_object(
+                'from_entity', OLD.from_entity,
+                'to_entity', OLD.to_entity,
+                'relation_type', OLD.relation_type,
+                'valid_from', OLD.valid_from,
+                'valid_until', OLD.valid_until,
+                'confidence_score', OLD.confidence_score,
+                'context_source', OLD.context_source
+            )
+        );
+    END
     """
 ]
 

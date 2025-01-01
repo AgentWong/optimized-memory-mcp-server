@@ -15,6 +15,7 @@ from .operations.cloud_ops import CloudResourceOperations
 from .operations.terraform_ops import TerraformOperations
 from .operations.ansible_ops import AnsibleOperations
 from .operations.snippet_ops import SnippetOperations
+from .operations.temporal_ops import TemporalOperations
 from ...interfaces import CloudResource, CloudResourceType
 from ...interfaces import Entity, Relation
 from ...exceptions import EntityNotFoundError, EntityAlreadyExistsError
@@ -51,6 +52,7 @@ class SQLiteManager(StorageBackend):
         self.terraform_ops = TerraformOperations(self.pool)
         self.ansible_ops = AnsibleOperations(self.pool)
         self.snippet_ops = SnippetOperations(self.pool)
+        self.temporal_ops = TemporalOperations(self.pool)
 
     async def initialize(self) -> None:
         """Initialize database schema."""
@@ -235,3 +237,57 @@ class SQLiteManager(StorageBackend):
     ) -> List[Dict[str, Any]]:
         """Get detailed task execution information."""
         return await self.ansible_ops.get_task_details(run_id, host)
+
+    async def get_entity_at_time(
+        self,
+        entity_name: str,
+        point_in_time: datetime
+    ) -> Optional[Dict[str, Any]]:
+        """Get entity state at a specific point in time."""
+        return await self.temporal_ops.get_entity_at_time(entity_name, point_in_time)
+
+    async def get_entity_changes(
+        self,
+        entity_name: str,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None
+    ) -> List[Dict[str, Any]]:
+        """Get history of entity changes within a time range."""
+        return await self.temporal_ops.get_entity_changes(
+            entity_name, start_time, end_time
+        )
+
+    async def get_relations_at_time(
+        self,
+        entity_name: str,
+        point_in_time: datetime,
+        direction: str = 'both'
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """Get entity's relations at a specific point in time."""
+        return await self.temporal_ops.get_relations_at_time(
+            entity_name, point_in_time, direction
+        )
+
+    async def track_entity_change(
+        self,
+        entity_name: str,
+        change_type: str,
+        entity_state: Dict[str, Any],
+        changed_by: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Record an entity change in the change history."""
+        return await self.temporal_ops.track_entity_change(
+            entity_name, change_type, entity_state, changed_by
+        )
+
+    async def get_changes_in_period(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        entity_type: Optional[str] = None,
+        change_type: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all changes within a time period with optional filtering."""
+        return await self.temporal_ops.get_changes_in_period(
+            start_time, end_time, entity_type, change_type
+        )
