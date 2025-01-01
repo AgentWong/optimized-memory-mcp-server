@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+"""Main entry point for the memory MCP server."""
 import asyncio
 import json
 import logging
