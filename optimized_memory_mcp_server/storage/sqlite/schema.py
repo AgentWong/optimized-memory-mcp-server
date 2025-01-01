@@ -103,6 +103,35 @@ SCHEMA_STATEMENTS = [
         FOREIGN KEY (entity_name) REFERENCES entities(name) ON DELETE CASCADE
     )
     """,
+
+    # Terraform State table
+    """
+    CREATE TABLE IF NOT EXISTS terraform_states (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        workspace TEXT NOT NULL,
+        state_file TEXT NOT NULL,
+        last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        metadata JSON,
+        UNIQUE(workspace, state_file)
+    )
+    """,
+
+    # Terraform Resources table
+    """
+    CREATE TABLE IF NOT EXISTS terraform_resources (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        resource_id TEXT NOT NULL,
+        resource_type TEXT NOT NULL,
+        workspace TEXT NOT NULL,
+        state_file TEXT NOT NULL,
+        state JSON NOT NULL,
+        cloud_resource_id TEXT,
+        last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (cloud_resource_id) REFERENCES cloud_resources(resource_id),
+        FOREIGN KEY (workspace, state_file) REFERENCES terraform_states(workspace, state_file),
+        UNIQUE(resource_id, workspace, state_file)
+    )
+    """,
     
     # Indices
     "CREATE INDEX IF NOT EXISTS idx_entity_type ON entities(entity_type)",
@@ -113,6 +142,8 @@ SCHEMA_STATEMENTS = [
     "CREATE INDEX IF NOT EXISTS idx_to_entity ON relations(to_entity)",
     "CREATE INDEX IF NOT EXISTS idx_relations_from_type ON relations(from_entity, relation_type)",
     "CREATE INDEX IF NOT EXISTS idx_cloud_resources_type ON cloud_resources(resource_type)",
+    "CREATE INDEX IF NOT EXISTS idx_terraform_resources_type ON terraform_resources(resource_type)",
+    "CREATE INDEX IF NOT EXISTS idx_terraform_resources_cloud ON terraform_resources(cloud_resource_id)",
     
     # Triggers for last_updated timestamps
     """
@@ -130,6 +161,66 @@ SCHEMA_STATEMENTS = [
     BEGIN
         UPDATE cloud_resources SET last_updated = CURRENT_TIMESTAMP
         WHERE resource_id = NEW.resource_id;
+    END
+    """,
+
+    # Ansible Playbooks table
+    """
+    CREATE TABLE IF NOT EXISTS ansible_playbooks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        playbook_path TEXT NOT NULL,
+        inventory_path TEXT,
+        last_run TIMESTAMP,
+        metadata JSON,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(playbook_path, inventory_path)
+    )
+    """,
+
+    # Ansible Runs table
+    """
+    CREATE TABLE IF NOT EXISTS ansible_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        playbook_id INTEGER NOT NULL,
+        start_time TIMESTAMP NOT NULL,
+        end_time TIMESTAMP,
+        status TEXT NOT NULL,  -- 'running', 'completed', 'failed'
+        host_count INTEGER,
+        metadata JSON,
+        FOREIGN KEY (playbook_id) REFERENCES ansible_playbooks(id)
+    )
+    """,
+
+    # Ansible Tasks table
+    """
+    CREATE TABLE IF NOT EXISTS ansible_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id INTEGER NOT NULL,
+        task_name TEXT NOT NULL,
+        host TEXT NOT NULL,
+        status TEXT NOT NULL,  -- 'ok', 'changed', 'failed', 'skipped'
+        start_time TIMESTAMP NOT NULL,
+        end_time TIMESTAMP,
+        result JSON,
+        cloud_resource_id TEXT,
+        FOREIGN KEY (run_id) REFERENCES ansible_runs(id),
+        FOREIGN KEY (cloud_resource_id) REFERENCES cloud_resources(resource_id)
+    )
+    """,
+
+    # Add indices
+    "CREATE INDEX IF NOT EXISTS idx_ansible_runs_playbook ON ansible_runs(playbook_id)",
+    "CREATE INDEX IF NOT EXISTS idx_ansible_tasks_run ON ansible_tasks(run_id)",
+    "CREATE INDEX IF NOT EXISTS idx_ansible_tasks_cloud ON ansible_tasks(cloud_resource_id)",
+
+    # Add trigger for last_updated
+    """
+    CREATE TRIGGER IF NOT EXISTS update_ansible_playbooks_timestamp
+    AFTER UPDATE ON ansible_playbooks
+    BEGIN
+        UPDATE ansible_playbooks SET last_updated = CURRENT_TIMESTAMP
+        WHERE id = NEW.id;
     END
     """
 ]

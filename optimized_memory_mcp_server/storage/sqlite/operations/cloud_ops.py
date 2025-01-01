@@ -127,3 +127,125 @@ class CloudResourceOperations:
                 "DELETE FROM cloud_resources WHERE resource_id = ?",
                 (resource_id,)
             )
+
+    async def sync_resource_tags(
+        self,
+        resource_id: str,
+        tags: Dict[str, str]
+    ) -> Dict[str, Any]:
+        """Sync AWS resource tags and update last_synced timestamp.
+        
+        Args:
+            resource_id: AWS resource identifier
+            tags: Dictionary of AWS tags
+            
+        Returns:
+            Updated cloud resource record
+            
+        Raises:
+            EntityNotFoundError: If resource doesn't exist
+        """
+        async with self.pool.get_connection() as conn:
+            async with self.pool.transaction(conn):
+                # First check if resource exists
+                cursor = await conn.execute(
+                    "SELECT 1 FROM cloud_resources WHERE resource_id = ?",
+                    (resource_id,)
+                )
+                if not await cursor.fetchone():
+                    raise EntityNotFoundError(f"Cloud resource {resource_id} not found")
+
+                # Update tags and sync timestamp
+                cursor = await conn.execute(
+                    """
+                    UPDATE cloud_resources 
+                    SET tags = ?, last_synced = CURRENT_TIMESTAMP
+                    WHERE resource_id = ?
+                    RETURNING *
+                    """,
+                    (json.dumps(tags), resource_id)
+                )
+                row = await cursor.fetchone()
+                if row:
+                    return CloudResource.from_dict(dict(row)).to_dict()
+                return None
+
+    async def bulk_sync_resource_tags(
+        self,
+        tag_updates: List[Dict[str, Any]],
+        batch_size: int = 1000
+    ) -> List[Dict[str, Any]]:
+        """Sync tags for multiple resources in batches.
+        
+        Args:
+            tag_updates: List of dicts with resource_id and tags
+            batch_size: Number of resources to update per batch
+            
+        Returns:
+            List of updated cloud resource records
+        """
+        updated_resources = []
+        
+        async with self.pool.get_connection() as conn:
+            async with self.pool.transaction(conn):
+                for i in range(0, len(tag_updates), batch_size):
+                    batch = tag_updates[i:i + batch_size]
+                    
+                    # Prepare batch update data
+                    values = [(
+                        json.dumps(update['tags']),
+                        update['resource_id']
+                    ) for update in batch]
+                    
+                    # Execute batch update
+                    await conn.executemany(
+                        """
+                        UPDATE cloud_resources
+                        SET tags = ?, last_synced = CURRENT_TIMESTAMP
+                        WHERE resource_id = ?
+                        """,
+                        values
+                    )
+                    
+                    # Fetch updated records
+                    resource_ids = [update['resource_id'] for update in batch]
+                    placeholders = ','.join('?' * len(resource_ids))
+                    cursor = await conn.execute(
+                        f"""
+                        SELECT * FROM cloud_resources 
+                        WHERE resource_id IN ({placeholders})
+                        """,
+                        resource_ids
+                    )
+                    rows = await cursor.fetchall()
+                    updated_resources.extend([
+                        CloudResource.from_dict(dict(row)).to_dict()
+                        for row in rows
+                    ])
+                    
+        return updated_resources
+
+    async def get_resources_needing_sync(
+        self,
+        max_age_hours: int = 24
+    ) -> List[Dict[str, Any]]:
+        """Get resources that haven't had their tags synced recently.
+        
+        Args:
+            max_age_hours: Maximum age of tag sync in hours
+            
+        Returns:
+            List of resources needing tag synchronization
+        """
+        async with self.pool.get_connection() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT * FROM cloud_resources 
+                WHERE last_synced IS NULL
+                OR last_synced < datetime('now', ?)
+                ORDER BY last_synced ASC NULLS FIRST
+                """,
+                (f'-{max_age_hours} hours',)
+            )
+            rows = await cursor.fetchall()
+            return [CloudResource.from_dict(dict(row)).to_dict() for row in rows]

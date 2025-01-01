@@ -62,16 +62,16 @@
   - Resource relationship mapping
   - State history
   - Entity linking
-- [ ] AWS tagging sync
+- [x] AWS tagging sync
 
-### IaC Integration [3.2]
-- [ ] Terraform state tracking
-- [ ] Ansible playbook tracking
+### IaC Integration [3.2] ✓
+- [x] Terraform state tracking
+- [x] Ansible playbook tracking
 
 ## Context Features [4.0]
 
-### Conversation Context [4.1]
-- [ ] Add conversation tracking
+### Conversation Context [4.1] (In Progress)
+- [x] Add conversation tracking
 - [ ] Implement relevance scoring
 
 ### Technical Context [4.2]
