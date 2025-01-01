@@ -291,7 +291,7 @@ lint-cmd:
 auto-lint: true
 
 ## Specify command to run tests
-test-cmd: pytest -v
+test-cmd: .venv/bin/python -m pytest -v
 
 ## Enable/disable automatic testing after changes (default: False)
 auto-test: true
