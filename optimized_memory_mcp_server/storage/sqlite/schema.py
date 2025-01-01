@@ -266,6 +266,97 @@ SCHEMA_STATEMENTS = [
         SET last_message_time = NEW.timestamp
         WHERE id = NEW.conversation_id;
     END
+    """,
+
+    # Code Snippets table
+    """
+    CREATE TABLE IF NOT EXISTS code_snippets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        language TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        metadata JSON,
+        tags TEXT,  -- Comma-separated tags
+        entity_name TEXT,  -- Associated entity
+        similarity_hash TEXT,  -- For pattern matching
+        FOREIGN KEY (entity_name) REFERENCES entities(name) ON DELETE SET NULL
+    )
+    """,
+
+    # Snippet Versions table for tracking changes
+    """
+    CREATE TABLE IF NOT EXISTS snippet_versions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        snippet_id INTEGER NOT NULL,
+        content TEXT NOT NULL,
+        version_number INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        commit_message TEXT,
+        diff TEXT,  -- Stored diff from previous version
+        FOREIGN KEY (snippet_id) REFERENCES code_snippets(id) ON DELETE CASCADE,
+        UNIQUE(snippet_id, version_number)
+    )
+    """,
+
+    # Snippet Patterns table for common patterns
+    """
+    CREATE TABLE IF NOT EXISTS snippet_patterns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pattern_name TEXT NOT NULL,
+        pattern_type TEXT NOT NULL,  -- 'syntax', 'semantic', 'usage'
+        pattern_hash TEXT NOT NULL,  -- Hash of the pattern
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        occurrence_count INTEGER DEFAULT 1,
+        UNIQUE(pattern_hash)
+    )
+    """,
+
+    # Snippet Pattern Matches table
+    """
+    CREATE TABLE IF NOT EXISTS snippet_pattern_matches (
+        snippet_id INTEGER NOT NULL,
+        pattern_id INTEGER NOT NULL,
+        match_location TEXT,  -- JSON array of line numbers/positions
+        confidence_score FLOAT DEFAULT 1.0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (snippet_id, pattern_id),
+        FOREIGN KEY (snippet_id) REFERENCES code_snippets(id) ON DELETE CASCADE,
+        FOREIGN KEY (pattern_id) REFERENCES snippet_patterns(id) ON DELETE CASCADE
+    )
+    """,
+
+    # Add indices
+    "CREATE INDEX IF NOT EXISTS idx_snippets_language ON code_snippets(language)",
+    "CREATE INDEX IF NOT EXISTS idx_snippets_entity ON code_snippets(entity_name)",
+    "CREATE INDEX IF NOT EXISTS idx_snippets_similarity ON code_snippets(similarity_hash)",
+    "CREATE INDEX IF NOT EXISTS idx_snippet_versions ON snippet_versions(snippet_id, version_number)",
+    "CREATE INDEX IF NOT EXISTS idx_patterns_hash ON snippet_patterns(pattern_hash)",
+    "CREATE INDEX IF NOT EXISTS idx_pattern_matches_pattern ON snippet_pattern_matches(pattern_id)",
+
+    # Add trigger for last_updated
+    """
+    CREATE TRIGGER IF NOT EXISTS update_code_snippets_timestamp
+    AFTER UPDATE ON code_snippets
+    BEGIN
+        UPDATE code_snippets SET last_updated = CURRENT_TIMESTAMP
+        WHERE id = NEW.id;
+    END
+    """,
+
+    # Add trigger for pattern last_seen
+    """
+    CREATE TRIGGER IF NOT EXISTS update_pattern_last_seen
+    AFTER INSERT ON snippet_pattern_matches
+    BEGIN
+        UPDATE snippet_patterns 
+        SET last_seen = CURRENT_TIMESTAMP,
+            occurrence_count = occurrence_count + 1
+        WHERE id = NEW.pattern_id;
+    END
     """
 ]
 

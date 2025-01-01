@@ -74,9 +74,16 @@
 - [x] Add conversation tracking
 - [x] Implement relevance scoring
 
-### Technical Context [4.2]
-- [ ] Add code snippet storage
-- [ ] Add pattern recognition
+### Technical Context [4.2] ✓
+- [x] Add code snippet storage
+    - [x] Schema design for storing code snippets
+    - [x] Language detection and syntax highlighting
+    - [x] Version tracking and diffs
+    - [x] Association with entities
+- [x] Add pattern recognition
+    - [x] Code similarity analysis
+    - [x] Common pattern detection
+    - [x] Usage pattern tracking
 
 ### Time-Aware Features [4.3]
 - [ ] Add temporal queries

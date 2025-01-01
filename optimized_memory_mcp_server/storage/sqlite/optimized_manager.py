@@ -14,6 +14,7 @@ from .operations.search_ops import SearchOperations
 from .operations.cloud_ops import CloudResourceOperations
 from .operations.terraform_ops import TerraformOperations
 from .operations.ansible_ops import AnsibleOperations
+from .operations.snippet_ops import SnippetOperations
 from ...interfaces import CloudResource, CloudResourceType
 from ...interfaces import Entity, Relation
 from ...exceptions import EntityNotFoundError, EntityAlreadyExistsError
@@ -49,6 +50,7 @@ class SQLiteManager(StorageBackend):
         self.cloud_ops = CloudResourceOperations(self.pool)
         self.terraform_ops = TerraformOperations(self.pool)
         self.ansible_ops = AnsibleOperations(self.pool)
+        self.snippet_ops = SnippetOperations(self.pool)
 
     async def initialize(self) -> None:
         """Initialize database schema."""
