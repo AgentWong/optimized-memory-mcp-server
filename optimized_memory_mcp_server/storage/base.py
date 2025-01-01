@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 
-from ..core.interfaces import Entity, Relation
+from ..interfaces import Entity, Relation
 
 class StorageBackend(ABC):
     """Abstract base class for storage backends."""

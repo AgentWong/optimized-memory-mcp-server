@@ -1,21 +1,22 @@
 """Input sanitization utilities for SQLite backend."""
-from ....core.sanitization.strategies import SQLiteSanitizer
-from ....core.sanitization.validators import validate_sanitization_input
+from typing import Optional, Union
 
-_sanitizer = SQLiteSanitizer()
-
-
-def sanitize_input(value: str) -> str:
+def sanitize_input(value: Optional[Union[str, bytes]]) -> str:
     """Sanitize input to prevent SQL injection.
     
     Args:
-        value: Input string to sanitize
+        value: Input string or bytes to sanitize
         
     Returns:
         str: Sanitized string safe for SQLite
         
     Raises:
-        TypeError: If value is not a string or bytes
+        TypeError: If value is not a string/bytes or is None
     """
-    validate_sanitization_input(value)
-    return _sanitizer.sanitize(value)
+    if value is None:
+        raise TypeError("Cannot sanitize None value")
+    if isinstance(value, bytes):
+        value = value.decode('utf-8')
+    if not isinstance(value, str):
+        raise TypeError(f"Expected string or bytes, got {type(value)}")
+    return value.replace("'", "''").replace('"', '""')

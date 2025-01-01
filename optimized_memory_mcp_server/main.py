@@ -1,4 +1,5 @@
 """Main entry point for the memory MCP server."""
+# Standard library imports
 import asyncio
 import json
 import logging
@@ -10,10 +11,12 @@ from urllib.parse import urlparse
 from asyncio import Semaphore
 from functools import wraps
 
+# Third-party imports
 import mcp.types as types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
+# Local imports
 from .optimized_sqlite_manager import OptimizedSQLiteManager
 from .exceptions import (
     KnowledgeGraphError,
@@ -21,6 +24,8 @@ from .exceptions import (
     EntityAlreadyExistsError,
     RelationValidationError,
 )
+
+# Configure logging
 
 logging.basicConfig(
     level=logging.INFO,
@@ -255,13 +260,33 @@ async def async_main():
         ]
 
     def rate_limit(max_requests: int = 100, window_seconds: int = 60):
+        """Rate limiting decorator for API endpoints."""
         semaphore = Semaphore(max_requests)
-        
+        window_start = time.monotonic()
+        request_count = 0
+        window_lock = asyncio.Lock()
+
         def decorator(func):
             @wraps(func)
             async def wrapper(*args, **kwargs):
-                async with semaphore:
-                    return await func(*args, **kwargs)
+                nonlocal window_start, request_count
+            
+                async with window_lock:
+                    current_time = time.monotonic()
+                    if current_time - window_start >= window_seconds:
+                        window_start = current_time
+                        request_count = 0
+                    
+                    if request_count >= max_requests:
+                        raise Exception("Rate limit exceeded")
+                    
+                    try:
+                        async with semaphore:
+                            request_count += 1
+                            return await func(*args, **kwargs)
+                    except Exception as e:
+                        logger.error(f"Rate limit error: {e}")
+                        raise
             return wrapper
         return decorator
 
