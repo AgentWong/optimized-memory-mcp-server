@@ -1,7 +1,12 @@
 import aiosqlite
 from typing import List
+from .schema.partitions import PARTITIONED_TABLES, MATERIALIZED_VIEWS, PARTITION_TRIGGERS, PARTITION_INDICES
 
 SCHEMA_STATEMENTS = [
+    # Enable SQLite features
+    "PRAGMA journal_mode=WAL",
+    "PRAGMA synchronous=NORMAL",
+    "PRAGMA temp_store=MEMORY",
     # Enable SQLite Window Functions
     "PRAGMA enable_window_functions = ON",
     
@@ -91,6 +96,8 @@ SCHEMA_STATEMENTS = [
         account_id TEXT,
         metadata JSON,
         entity_name TEXT,
+        tags JSON,
+        last_synced TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (entity_name) REFERENCES entities(name) ON DELETE CASCADE

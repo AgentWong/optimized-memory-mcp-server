@@ -50,10 +50,10 @@
   - Idle timeout
 - [x] Connection retry logic
 
-### Query Optimization [2.3]
+### Query Optimization [2.3] ✓
 - [x] Batch processing
-- [ ] Prepared statement caching
-- [ ] Query result caching
+- [x] Prepared statement caching
+- [x] Query result caching
 
 ## Cloud Features [3.0]
 

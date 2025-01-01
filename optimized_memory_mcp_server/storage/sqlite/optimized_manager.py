@@ -117,7 +117,11 @@ class SQLiteManager(StorageBackend):
         """Retrieve specific nodes by name and their relations."""
         return await self.search_ops.open_nodes(names)
 
-    async def create_cloud_resource(self, resource: CloudResource) -> Dict[str, Any]:
+    async def create_cloud_resource(
+        self,
+        resource: CloudResource,
+        tags: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
         """Create a new cloud resource record."""
         return await self.cloud_ops.create_resource(resource)
 
