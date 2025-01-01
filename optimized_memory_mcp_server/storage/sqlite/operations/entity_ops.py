@@ -93,9 +93,11 @@ class EntityOperations:
         return added_observations
 """Entity operations for SQLite storage backend."""
 from typing import List, Dict, Any
-from ....interfaces import Entity
-from ....exceptions import EntityNotFoundError, EntityAlreadyExistsError
+import aiosqlite
 from ..utils.sanitization import sanitize_input
+from ..utils.validation import validate_entity
+from ..interfaces import Entity
+from ..exceptions import EntityNotFoundError, EntityAlreadyExistsError
 
 class EntityOperations:
     """Handles entity-related database operations."""

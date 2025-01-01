@@ -2,19 +2,21 @@ from dataclasses import dataclass
 from typing import List, Dict, Any
 
 
+from typing import Union, Tuple
+
 @dataclass(frozen=True)  # Make it hashable by adding frozen=True
 class Entity:
     name: str
     entityType: str
-    observations: tuple  # Change list to tuple to make it hashable
+    observations: Tuple[str, ...]  # Proper tuple typing
 
-    def __init__(self, name: str, entityType: str, observations: List[str]):
+    def __init__(self, name: str, entityType: str, observations: Union[List[str], Tuple[str, ...]]):
         # We need to use object.__setattr__ because the class is frozen
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "entityType", entityType)
         object.__setattr__(
             self, "observations", tuple(observations)
-        )  # Convert list to tuple
+        )  # Convert list/tuple to tuple
 
     @classmethod
     def from_dict(cls, data: dict) -> 'Entity':
