@@ -40,4 +40,7 @@ Thumbs.db
 *.db
 *.sqlite3
 *.log
+
 .aider*
+!.aider.conf.yml
+!.aiderignore
