@@ -1,6 +1,6 @@
 """Tests for sanitization strategies."""
 import pytest
-from memory_mcp_server.core.sanitization.strategies import SQLiteSanitizer
+from ....core.sanitization.strategies import SQLiteSanitizer
 
 
 def test_sqlite_sanitizer_string():
@@ -14,6 +14,9 @@ def test_sqlite_sanitizer_string():
 def test_sqlite_sanitizer_non_string():
     """Test SQLite sanitization of non-string values."""
     sanitizer = SQLiteSanitizer()
-    assert sanitizer.sanitize(123) == 123
-    assert sanitizer.sanitize(None) is None
-    assert sanitizer.sanitize([1, 2, 3]) == [1, 2, 3]
+    with pytest.raises(TypeError):
+        sanitizer.sanitize(123)
+    with pytest.raises(TypeError):
+        sanitizer.sanitize(None)
+    with pytest.raises(TypeError):
+        sanitizer.sanitize([1, 2, 3])
