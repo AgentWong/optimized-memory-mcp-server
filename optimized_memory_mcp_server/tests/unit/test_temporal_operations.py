@@ -246,3 +246,228 @@ async def test_change_tracking_performance(connection_pool, populated_db):
     
     assert len(changes) >= 100
     assert query_time < 1.0  # Should complete within 1 second
+"""Unit tests for temporal operations."""
+import pytest
+from datetime import datetime, timedelta
+import json
+import asyncio
+from ....exceptions import EntityNotFoundError
+from ....storage.sqlite.operations.temporal_ops import TemporalOperations
+
+async def test_get_entity_changes_basic(connection_pool, populated_db):
+    """Test basic entity change tracking."""
+    temporal_ops = TemporalOperations(connection_pool)
+    
+    # Create an entity and make changes
+    async with connection_pool.get_connection() as conn:
+        await conn.execute(
+            """
+            INSERT INTO entities (name, entity_type, observations)
+            VALUES (?, ?, ?)
+            """,
+            ("temporal_test", "test_type", "initial_obs")
+        )
+        
+        # Update entity
+        await conn.execute(
+            """
+            UPDATE entities 
+            SET observations = ?, last_updated = CURRENT_TIMESTAMP
+            WHERE name = ?
+            """,
+            ("updated_obs", "temporal_test")
+        )
+    
+    # Get changes
+    changes = await temporal_ops.get_entity_changes("temporal_test")
+    assert len(changes) == 2  # Create + Update
+    assert changes[0]["change_type"] == "create"
+    assert changes[1]["change_type"] == "update"
+    assert "updated_obs" in changes[1]["entity_state"]["observations"]
+
+async def test_get_entity_changes_time_range(connection_pool):
+    """Test getting entity changes within a time range."""
+    temporal_ops = TemporalOperations(connection_pool)
+    
+    # Create entity
+    start_time = datetime.now()
+    async with connection_pool.get_connection() as conn:
+        await conn.execute(
+            """
+            INSERT INTO entities (name, entity_type, observations)
+            VALUES (?, ?, ?)
+            """,
+            ("time_range_test", "test_type", "obs1")
+        )
+        
+        # Wait briefly
+        await asyncio.sleep(0.1)
+        mid_time = datetime.now()
+        
+        # Make more changes
+        await conn.execute(
+            """
+            UPDATE entities 
+            SET observations = ?, last_updated = CURRENT_TIMESTAMP
+            WHERE name = ?
+            """,
+            ("obs2", "time_range_test")
+        )
+    end_time = datetime.now()
+    
+    # Test different time ranges
+    all_changes = await temporal_ops.get_entity_changes(
+        "time_range_test",
+        start_time=start_time,
+        end_time=end_time
+    )
+    assert len(all_changes) == 2
+    
+    early_changes = await temporal_ops.get_entity_changes(
+        "time_range_test",
+        start_time=start_time,
+        end_time=mid_time
+    )
+    assert len(early_changes) == 1
+    assert early_changes[0]["change_type"] == "create"
+
+async def test_get_relation_changes(connection_pool, populated_db):
+    """Test relation change tracking."""
+    temporal_ops = TemporalOperations(connection_pool)
+    
+    # Create and modify relations
+    async with connection_pool.get_connection() as conn:
+        # Create relation
+        await conn.execute(
+            """
+            INSERT INTO relations (
+                from_entity, to_entity, relation_type,
+                confidence_score, context_source
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            ("test_entity_1", "test_entity_2", "temporal_relation", 0.8, "test")
+        )
+        
+        # Update relation
+        await conn.execute(
+            """
+            UPDATE relations 
+            SET confidence_score = ?, last_updated = CURRENT_TIMESTAMP
+            WHERE from_entity = ? AND to_entity = ? AND relation_type = ?
+            """,
+            (0.9, "test_entity_1", "test_entity_2", "temporal_relation")
+        )
+    
+    # Get relation changes
+    changes = await temporal_ops.get_relation_changes(
+        from_entity="test_entity_1",
+        to_entity="test_entity_2",
+        relation_type="temporal_relation"
+    )
+    assert len(changes) == 2
+    assert changes[0]["change_type"] == "create"
+    assert changes[1]["change_type"] == "update"
+    assert changes[1]["relation_state"]["confidence_score"] == 0.9
+
+async def test_entity_deletion_tracking(connection_pool):
+    """Test tracking of entity deletions."""
+    temporal_ops = TemporalOperations(connection_pool)
+    
+    # Create and then delete an entity
+    async with connection_pool.get_connection() as conn:
+        await conn.execute(
+            """
+            INSERT INTO entities (name, entity_type)
+            VALUES (?, ?)
+            """,
+            ("deletion_test", "test_type")
+        )
+        
+        await conn.execute(
+            "DELETE FROM entities WHERE name = ?",
+            ("deletion_test",)
+        )
+    
+    # Verify deletion was tracked
+    changes = await temporal_ops.get_entity_changes("deletion_test")
+    assert len(changes) == 2
+    assert changes[-1]["change_type"] == "delete"
+
+async def test_relation_validity_tracking(connection_pool, populated_db):
+    """Test tracking relation validity periods."""
+    temporal_ops = TemporalOperations(connection_pool)
+    
+    valid_from = datetime.now()
+    valid_until = valid_from + timedelta(days=30)
+    
+    async with connection_pool.get_connection() as conn:
+        # Create relation with validity period
+        await conn.execute(
+            """
+            INSERT INTO relations (
+                from_entity, to_entity, relation_type,
+                valid_from, valid_until
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                "test_entity_1", "test_entity_2", "validity_test",
+                valid_from.isoformat(), valid_until.isoformat()
+            )
+        )
+        
+        # Update validity period
+        new_valid_until = valid_until + timedelta(days=30)
+        await conn.execute(
+            """
+            UPDATE relations 
+            SET valid_until = ?, last_updated = CURRENT_TIMESTAMP
+            WHERE from_entity = ? AND to_entity = ? AND relation_type = ?
+            """,
+            (
+                new_valid_until.isoformat(),
+                "test_entity_1", "test_entity_2", "validity_test"
+            )
+        )
+    
+    # Get changes and verify validity tracking
+    changes = await temporal_ops.get_relation_changes(
+        from_entity="test_entity_1",
+        to_entity="test_entity_2",
+        relation_type="validity_test"
+    )
+    assert len(changes) == 2
+    assert "valid_until" in changes[1]["relation_state"]
+    assert datetime.fromisoformat(changes[1]["relation_state"]["valid_until"]) == new_valid_until
+
+async def test_metadata_change_tracking(connection_pool):
+    """Test tracking changes to entity metadata."""
+    temporal_ops = TemporalOperations(connection_pool)
+    
+    initial_metadata = {"key": "initial_value"}
+    updated_metadata = {"key": "updated_value"}
+    
+    async with connection_pool.get_connection() as conn:
+        # Create entity with metadata
+        await conn.execute(
+            """
+            INSERT INTO entities (name, entity_type, metadata)
+            VALUES (?, ?, ?)
+            """,
+            ("metadata_test", "test_type", json.dumps(initial_metadata))
+        )
+        
+        # Update metadata
+        await conn.execute(
+            """
+            UPDATE entities 
+            SET metadata = ?, last_updated = CURRENT_TIMESTAMP
+            WHERE name = ?
+            """,
+            (json.dumps(updated_metadata), "metadata_test")
+        )
+    
+    # Verify metadata changes are tracked
+    changes = await temporal_ops.get_entity_changes("metadata_test")
+    assert len(changes) == 2
+    assert changes[0]["entity_state"]["metadata"] == initial_metadata
+    assert changes[1]["entity_state"]["metadata"] == updated_metadata

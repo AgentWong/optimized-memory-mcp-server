@@ -215,10 +215,21 @@ class TemporalOperations:
     async def get_entity_at_time(
         self,
         entity_name: str,
-        point_in_time: datetime
+        point_in_time: datetime,
+        include_relations: bool = False
     ) -> Optional[Dict[str, Any]]:
-        """Get entity state at a specific point in time."""
+        """Get entity state at a specific point in time.
+        
+        Args:
+            entity_name: Name of entity to retrieve
+            point_in_time: Timestamp to query
+            include_relations: Whether to include related entities
+            
+        Returns:
+            Entity state and optionally related entities at the specified time
+        """
         async with self.pool.get_connection() as conn:
+            # Get entity state
             cursor = await conn.execute(
                 """
                 SELECT * FROM entity_changes 
@@ -229,18 +240,67 @@ class TemporalOperations:
                 (sanitize_input(entity_name), point_in_time.isoformat())
             )
             row = await cursor.fetchone()
-            if row:
-                return json.loads(row['entity_state'])
-            return None
+            if not row:
+                return None
+                
+            result = {"entity": json.loads(row['entity_state'])}
+            
+            if include_relations:
+                # Get related entities
+                cursor = await conn.execute(
+                    """
+                    SELECT r.*, ec.entity_state
+                    FROM relations r
+                    JOIN entity_changes ec ON (
+                        ec.entity_name = CASE 
+                            WHEN r.from_entity = ? THEN r.to_entity
+                            ELSE r.from_entity
+                        END
+                    )
+                    WHERE (r.from_entity = ? OR r.to_entity = ?)
+                    AND r.valid_from <= ?
+                    AND (r.valid_until IS NULL OR r.valid_until > ?)
+                    AND ec.changed_at <= ?
+                    ORDER BY ec.changed_at DESC
+                    """,
+                    (
+                        sanitize_input(entity_name),
+                        sanitize_input(entity_name),
+                        sanitize_input(entity_name),
+                        point_in_time.isoformat(),
+                        point_in_time.isoformat(),
+                        point_in_time.isoformat()
+                    )
+                )
+                rows = await cursor.fetchall()
+                result["relations"] = [{
+                    "relation_type": row["relation_type"],
+                    "direction": "outgoing" if row["from_entity"] == entity_name else "incoming",
+                    "related_entity": json.loads(row["entity_state"])
+                } for row in rows]
+                
+            return result
 
     async def get_entity_changes(
         self,
         entity_name: str,
         start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None
-    ) -> List[Dict[str, Any]]:
-        """Get history of entity changes within a time range."""
+        end_time: Optional[datetime] = None,
+        include_aggregations: bool = False
+    ) -> Dict[str, Any]:
+        """Get history of entity changes within a time range with optional aggregations.
+        
+        Args:
+            entity_name: Name of entity to retrieve history for
+            start_time: Start of time range (optional)
+            end_time: End of time range (optional)
+            include_aggregations: Whether to include change statistics
+            
+        Returns:
+            Dict containing changes and optional aggregations
+        """
         async with self.pool.get_connection() as conn:
+            # Base query for changes
             query = "SELECT * FROM entity_changes WHERE entity_name = ?"
             params = [sanitize_input(entity_name)]
 
@@ -255,16 +315,41 @@ class TemporalOperations:
             
             cursor = await conn.execute(query, params)
             rows = await cursor.fetchall()
-            return [
-                {
+            result = {
+                "changes": [{
                     'entity_name': row['entity_name'],
                     'changed_at': row['changed_at'],
                     'change_type': row['change_type'],
                     'entity_state': json.loads(row['entity_state']),
                     'changed_by': row['changed_by']
-                }
-                for row in rows
-            ]
+                } for row in rows]
+            }
+            
+            if include_aggregations:
+                # Add change statistics
+                agg_cursor = await conn.execute(
+                    """
+                    SELECT 
+                        COUNT(*) as total_changes,
+                        COUNT(CASE WHEN change_type = 'create' THEN 1 END) as creates,
+                        COUNT(CASE WHEN change_type = 'update' THEN 1 END) as updates,
+                        COUNT(CASE WHEN change_type = 'delete' THEN 1 END) as deletes,
+                        COUNT(DISTINCT changed_by) as unique_changers,
+                        MIN(changed_at) as first_change,
+                        MAX(changed_at) as last_change
+                    FROM entity_changes 
+                    WHERE entity_name = ?
+                    AND changed_at BETWEEN ? AND ?
+                    """,
+                    (
+                        sanitize_input(entity_name),
+                        (start_time or datetime.min).isoformat(),
+                        (end_time or datetime.max).isoformat()
+                    )
+                )
+                result["aggregations"] = dict(await agg_cursor.fetchone())
+                
+            return result
 
     async def get_relations_at_time(
         self,
