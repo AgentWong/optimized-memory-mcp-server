@@ -14,19 +14,25 @@ class SearchOperations:
         if not query:
             raise ValueError("Search query cannot be empty")
 
+        # Check cache first
+        cache_key = f"search:{query}"
+        cached_result = self.pool.get_cached_query(cache_key)
+        if cached_result is not None:
+            return cached_result
+
         async with self.pool.get_connection() as conn:
             search_pattern = f"%{sanitize_input(query)}%"
             
-            # Search entities
-            cursor = await conn.execute(
+            # Use cached prepared statement
+            stmt = await self.pool.prepare_cached(conn,
                 """
                 SELECT * FROM entities 
                 WHERE name LIKE ? 
                 OR entity_type LIKE ? 
                 OR observations LIKE ?
-                """,
-                (search_pattern, search_pattern, search_pattern)
+                """
             )
+            cursor = await stmt.execute((search_pattern, search_pattern, search_pattern))
             rows = await cursor.fetchall()
             
             entities = []
@@ -41,7 +47,11 @@ class SearchOperations:
                 entity_names.add(entity.name)
 
             relations = await self._get_relations_for_entities(conn, entity_names)
-            return {"entities": entities, "relations": relations}
+            result = {"entities": entities, "relations": relations}
+            
+            # Cache the result
+            self.pool.cache_query(cache_key, result)
+            return result
 
     async def open_nodes(self, names: List[str]) -> Dict[str, List[Dict[str, Any]]]:
         """Retrieve specific nodes and their relations."""
