@@ -1,7 +1,7 @@
 import asyncio
 import aiosqlite
 import logging
-from typing import AsyncGenerator, List, Optional
+from typing import AsyncGenerator, List, Optional, Dict, Any
 from contextlib import asynccontextmanager
 
 logger = logging.getLogger(__name__)
@@ -13,6 +13,13 @@ class SQLiteConnectionPool:
         self._pool_size: int = pool_size
         self._pool: List[aiosqlite.Connection] = []
         self._pool_semaphore: asyncio.Semaphore = asyncio.Semaphore(pool_size)
+        self._prepared_statements: Dict[str, Any] = {}
+
+    async def prepare_statement(self, conn: aiosqlite.Connection, sql: str) -> Any:
+        """Get or create a prepared statement."""
+        if sql not in self._prepared_statements:
+            self._prepared_statements[sql] = await conn.prepare(sql)
+        return self._prepared_statements[sql]
 
     @asynccontextmanager
     async def get_connection(self) -> AsyncGenerator[aiosqlite.Connection, None]:
@@ -49,7 +56,11 @@ class SQLiteConnectionPool:
             raise
 
     async def cleanup(self):
-        """Clean up database connections in the pool."""
+        """Clean up database connections and prepared statements in the pool."""
+        for stmt in self._prepared_statements.values():
+            await stmt.close()
+        self._prepared_statements.clear()
+        
         for conn in self._pool:
             await conn.close()
         self._pool.clear()

@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Union, Tuple, Optional
-from datetime import datetime
+from datetime import datetime, UTC
 import json
 from enum import Enum
 
@@ -74,8 +74,8 @@ class Entity:
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "entityType", entityType)
         object.__setattr__(self, "observations", tuple(observations))
-        object.__setattr__(self, "created_at", created_at or datetime.utcnow())
-        object.__setattr__(self, "last_updated", last_updated or datetime.utcnow())
+        object.__setattr__(self, "created_at", created_at or datetime.now(UTC))
+        object.__setattr__(self, "last_updated", last_updated or datetime.now(UTC))
         object.__setattr__(self, "confidence_score", max(0.0, min(1.0, confidence_score)))
         object.__setattr__(self, "context_source", context_source)
         object.__setattr__(self, "metadata", metadata or {})
@@ -134,8 +134,8 @@ class Relation:
         object.__setattr__(self, "from_", from_)
         object.__setattr__(self, "to", to)
         object.__setattr__(self, "relationType", relationType)
-        object.__setattr__(self, "created_at", created_at or datetime.utcnow())
-        object.__setattr__(self, "valid_from", valid_from or datetime.utcnow())
+        object.__setattr__(self, "created_at", created_at or datetime.now(UTC))
+        object.__setattr__(self, "valid_from", valid_from or datetime.now(UTC))
         object.__setattr__(self, "valid_until", valid_until)
         object.__setattr__(self, "confidence_score", max(0.0, min(1.0, confidence_score)))
         object.__setattr__(self, "context_source", context_source)

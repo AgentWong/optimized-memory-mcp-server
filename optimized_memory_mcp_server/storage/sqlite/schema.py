@@ -2,6 +2,9 @@ import aiosqlite
 from typing import List
 
 SCHEMA_STATEMENTS = [
+    # Enable SQLite Window Functions
+    "PRAGMA enable_window_functions = ON",
+    
     # Knowledge Categories table
     """
     CREATE TABLE IF NOT EXISTS knowledge_categories (
@@ -45,6 +48,40 @@ SCHEMA_STATEMENTS = [
     )
     """,
     
+    # Partitioned Entities table by entity_type
+    """
+    CREATE TABLE IF NOT EXISTS entities_by_type (
+        name TEXT,
+        entity_type TEXT NOT NULL,
+        observations TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        confidence_score FLOAT DEFAULT 1.0 CHECK (confidence_score >= 0.0 AND confidence_score <= 1.0),
+        context_source TEXT,
+        metadata JSON,
+        category_id INTEGER,
+        PRIMARY KEY (entity_type, name),
+        FOREIGN KEY (category_id) REFERENCES knowledge_categories(id)
+    ) WITHOUT ROWID
+    """,
+
+    # Materialized view for high confidence entities
+    """
+    CREATE VIEW IF NOT EXISTS high_confidence_entities AS
+    SELECT * FROM entities 
+    WHERE confidence_score >= 0.8
+    """,
+
+    # Materialized view for recent relations
+    """
+    CREATE VIEW IF NOT EXISTS recent_relations AS
+    SELECT r.*, e1.entity_type as from_type, e2.entity_type as to_type
+    FROM relations r
+    JOIN entities e1 ON r.from_entity = e1.name
+    JOIN entities e2 ON r.to_entity = e2.name
+    WHERE r.created_at >= date('now', '-30 days')
+    """,
+
     # Cloud Resources table
     """
     CREATE TABLE IF NOT EXISTS cloud_resources (

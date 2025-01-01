@@ -3,7 +3,7 @@ import asyncio
 from pathlib import Path
 import tempfile
 import json
-from optimized_memory_mcp_server.storage.sqlite.optimized_manager import OptimizedSQLiteManager
+from optimized_memory_mcp_server.storage.sqlite.manager import SQLiteStorageBackend
 from optimized_memory_mcp_server.interfaces import Entity, Relation
 from optimized_memory_mcp_server.exceptions import EntityNotFoundError, EntityAlreadyExistsError
 
@@ -11,7 +11,7 @@ from optimized_memory_mcp_server.exceptions import EntityNotFoundError, EntityAl
 async def db_manager():
     """Create a temporary database for testing."""
     with tempfile.NamedTemporaryFile() as tmp:
-        manager = OptimizedSQLiteManager(f"sqlite:///{tmp.name}")
+        manager = SQLiteStorageBackend(f"sqlite:///{tmp.name}")
         await manager.initialize()
         yield manager
         await manager.cleanup()
