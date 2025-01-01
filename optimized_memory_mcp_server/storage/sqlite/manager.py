@@ -1,6 +1,8 @@
 """SQLite storage backend implementation."""
 import logging
+import json
 from typing import List, Dict, Any
+from datetime import datetime
 from urllib.parse import urlparse
 import os
 from pathlib import Path
@@ -72,10 +74,25 @@ class SQLiteStorageBackend(StorageBackend):
                         if await cursor.fetchone():
                             raise EntityAlreadyExistsError(entity.name)
                     
-                    # Insert batch
+                    # Insert batch with all fields
                     await conn.executemany(
-                        "INSERT INTO entities (name, entity_type, observations) VALUES (?, ?, ?)",
-                        [(e.name, e.entityType, ','.join(e.observations)) for e in entity_objects]
+                        """
+                        INSERT INTO entities (
+                            name, entity_type, observations, created_at, last_updated,
+                            confidence_score, context_source, metadata, category_id
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        [(
+                            e.name, 
+                            e.entityType,
+                            ','.join(e.observations),
+                            e.created_at.isoformat(),
+                            e.last_updated.isoformat(),
+                            e.confidence_score,
+                            e.context_source,
+                            json.dumps(e.metadata),
+                            e.category_id
+                        ) for e in entity_objects]
                     )
                     created_entities.extend([e.to_dict() for e in entity_objects])
                     
@@ -110,11 +127,22 @@ class SQLiteStorageBackend(StorageBackend):
                     # Insert batch
                     await conn.executemany(
                         """
-                        INSERT INTO relations (from_entity, to_entity, relation_type) 
-                        VALUES (?, ?, ?)
+                        INSERT INTO relations (
+                            from_entity, to_entity, relation_type, created_at,
+                            valid_from, valid_until, confidence_score, context_source
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT DO NOTHING
                         """,
-                        [(r.from_, r.to, r.relationType) for r in relation_objects]
+                        [(
+                            r.from_,
+                            r.to,
+                            r.relationType,
+                            r.created_at.isoformat(),
+                            r.valid_from.isoformat(),
+                            r.valid_until.isoformat() if r.valid_until else None,
+                            r.confidence_score,
+                            r.context_source
+                        ) for r in relation_objects]
                     )
                     created_relations.extend([r.to_dict() for r in relation_objects])
                     
@@ -131,7 +159,13 @@ class SQLiteStorageBackend(StorageBackend):
                 entity = Entity(
                     name=row['name'],
                     entityType=row['entity_type'],
-                    observations=row['observations'].split(',') if row['observations'] else []
+                    observations=row['observations'].split(',') if row['observations'] else [],
+                    created_at=datetime.fromisoformat(row['created_at']),
+                    last_updated=datetime.fromisoformat(row['last_updated']),
+                    confidence_score=float(row['confidence_score']),
+                    context_source=row['context_source'],
+                    metadata=json.loads(row['metadata']) if row['metadata'] else {},
+                    category_id=row['category_id']
                 )
                 entities.append(entity.to_dict())
 
@@ -143,7 +177,12 @@ class SQLiteStorageBackend(StorageBackend):
                 relation = Relation(
                     from_=row['from_entity'],
                     to=row['to_entity'],
-                    relationType=row['relation_type']
+                    relationType=row['relation_type'],
+                    created_at=datetime.fromisoformat(row['created_at']),
+                    valid_from=datetime.fromisoformat(row['valid_from']),
+                    valid_until=datetime.fromisoformat(row['valid_until']) if row['valid_until'] else None,
+                    confidence_score=float(row['confidence_score']),
+                    context_source=row['context_source']
                 )
                 relations.append(relation.to_dict())
 

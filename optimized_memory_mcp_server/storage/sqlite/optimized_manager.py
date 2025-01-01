@@ -1,4 +1,4 @@
-"""Optimized SQLite storage backend implementation."""
+"""SQLite storage backend implementation."""
 from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse
 import os
@@ -17,8 +17,8 @@ from .utils.sanitization import sanitize_input as _sanitize_input
 
 logger = logging.getLogger(__name__)
 
-class OptimizedSQLiteManager(StorageBackend):
-    """Optimized SQLite implementation of the storage backend."""
+class SQLiteManager(StorageBackend):
+    """SQLite implementation of the storage backend."""
     
     def __init__(self, database_url: str, echo: bool = False):
         """Initialize SQLite backend with database path extracted from URL."""
