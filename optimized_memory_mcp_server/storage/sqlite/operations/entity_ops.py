@@ -1,5 +1,7 @@
 """Entity operations for SQLite storage backend."""
 from typing import List, Dict, Any
+from datetime import datetime, timedelta
+import json
 import aiosqlite
 from ..utils.sanitization import sanitize_input
 from ....core.validation import validate_entity
@@ -17,7 +19,7 @@ class EntityOperations:
         entities: List[Dict[str, Any]], 
         batch_size: int = 1000
     ) -> List[Dict[str, Any]]:
-        """Create multiple new entities in batches."""
+        """Create multiple new entities in batches with partitioning."""
         created_entities = []
         
         async with self.pool.get_connection() as conn:
@@ -35,12 +37,35 @@ class EntityOperations:
                         if await cursor.fetchone():
                             raise EntityAlreadyExistsError(entity.name)
                     
-                    # Insert batch
-                    await conn.executemany(
-                        "INSERT INTO entities (name, entity_type, observations) VALUES (?, ?, ?)",
-                        [(e.name, e.entityType, ','.join(e.observations)) for e in entity_objects]
-                    )
-                    created_entities.extend([e.to_dict() for e in entity_objects])
+                    # Insert into appropriate partition based on creation date
+                    for entity in entity_objects:
+                        if entity.created_at >= datetime.now() - timedelta(days=30):
+                            table = "entities_recent"
+                        elif entity.created_at >= datetime.now() - timedelta(days=180):
+                            table = "entities_intermediate"
+                        else:
+                            table = "entities_archive"
+                            
+                        await conn.execute(
+                            f"""
+                            INSERT INTO {table} (
+                                name, entity_type, observations, created_at, last_updated,
+                                confidence_score, context_source, metadata, category_id
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                entity.name,
+                                entity.entityType,
+                                ','.join(entity.observations),
+                                entity.created_at.isoformat(),
+                                entity.last_updated.isoformat(),
+                                entity.confidence_score,
+                                entity.context_source,
+                                json.dumps(entity.metadata),
+                                entity.category_id
+                            )
+                        )
+                        created_entities.append(entity.to_dict())
                     
         return created_entities
 

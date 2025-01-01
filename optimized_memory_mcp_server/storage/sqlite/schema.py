@@ -1,5 +1,6 @@
 import aiosqlite
 from typing import List
+from datetime import datetime
 from .schema.partitions import PARTITIONED_TABLES, MATERIALIZED_VIEWS, PARTITION_TRIGGERS, PARTITION_INDICES
 
 SCHEMA_STATEMENTS = [
@@ -541,6 +542,12 @@ SCHEMA_STATEMENTS = [
     END
     """
 ]
+
+# Add partitioning-related statements
+SCHEMA_STATEMENTS.extend(PARTITIONED_TABLES)
+SCHEMA_STATEMENTS.extend(MATERIALIZED_VIEWS)
+SCHEMA_STATEMENTS.extend(PARTITION_TRIGGERS)
+SCHEMA_STATEMENTS.extend(PARTITION_INDICES)
 
 async def initialize_schema(conn: aiosqlite.Connection) -> None:
     """Initialize database schema and indices."""

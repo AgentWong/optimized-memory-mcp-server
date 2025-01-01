@@ -54,33 +54,50 @@ PARTITIONED_TABLES = [
 # Materialized views for common queries
 MATERIALIZED_VIEWS = [
     """
-    CREATE VIEW IF NOT EXISTS mv_entity_stats AS
-    SELECT 
-        entity_type,
-        COUNT(*) as count,
-        AVG(confidence_score) as avg_confidence,
-        MIN(created_at) as oldest_entry,
-        MAX(created_at) as newest_entry
-    FROM (
-        SELECT * FROM entities_recent
-        UNION ALL
-        SELECT * FROM entities_intermediate
-        UNION ALL
-        SELECT * FROM entities_archive
+    CREATE TABLE IF NOT EXISTS mv_entity_stats (
+        entity_type TEXT PRIMARY KEY,
+        count INTEGER,
+        avg_confidence FLOAT,
+        oldest_entry TIMESTAMP,
+        newest_entry TIMESTAMP,
+        last_refreshed TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
-    GROUP BY entity_type
     """,
     
     """
-    CREATE VIEW IF NOT EXISTS mv_relation_summary AS
-    SELECT 
-        relation_type,
-        COUNT(*) as count,
-        AVG(confidence_score) as avg_confidence,
-        COUNT(DISTINCT from_entity) as unique_sources,
-        COUNT(DISTINCT to_entity) as unique_targets
-    FROM relations
-    GROUP BY relation_type
+    CREATE TABLE IF NOT EXISTS mv_relation_summary (
+        relation_type TEXT PRIMARY KEY,
+        count INTEGER,
+        avg_confidence FLOAT,
+        unique_sources INTEGER,
+        unique_targets INTEGER,
+        last_refreshed TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    
+    """
+    CREATE TABLE IF NOT EXISTS mv_entity_temporal_stats (
+        time_window TEXT PRIMARY KEY,
+        total_entities INTEGER,
+        active_entities INTEGER,
+        avg_confidence FLOAT,
+        most_common_type TEXT,
+        type_count INTEGER,
+        last_refreshed TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    
+    """
+    CREATE TABLE IF NOT EXISTS mv_relation_patterns (
+        pattern_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        from_type TEXT,
+        relation_type TEXT,
+        to_type TEXT,
+        occurrence_count INTEGER,
+        avg_confidence FLOAT,
+        last_refreshed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(from_type, relation_type, to_type)
+    )
     """
 ]
 

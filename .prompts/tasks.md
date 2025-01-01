@@ -40,8 +40,8 @@
   - (entity_type, created_at)
   - (entity_type, confidence_score) 
   - (from_entity, relation_type)
-- [ ] Implement table partitioning
-- [ ] Add materialized views
+- [x] Implement table partitioning
+- [x] Add materialized views
 
 ### Connection Management [2.2] ✓
 - [x] Connection pooling with:

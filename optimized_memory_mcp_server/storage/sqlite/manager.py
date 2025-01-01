@@ -10,6 +10,7 @@ from pathlib import Path
 from ..base import StorageBackend
 from .connection import SQLiteConnectionPool
 from .schema import initialize_schema
+from .maintenance import MaintenanceManager
 from .operations.entity_ops import EntityOperations
 from .operations.relation_ops import RelationOperations
 from .operations.search_ops import SearchOperations
@@ -44,12 +45,14 @@ class SQLiteStorageBackend(StorageBackend):
         self.entity_ops = EntityOperations(self.pool)
         self.relation_ops = RelationOperations(self.pool)
         self.search_ops = SearchOperations(self.pool)
+        self.maintenance = MaintenanceManager(self.pool)
 
     async def initialize(self) -> None:
-        """Initialize database schema."""
+        """Initialize database schema and start maintenance."""
         async with self.pool.get_connection() as conn:
             async with self.pool.transaction(conn):
                 await initialize_schema(conn)
+        await self.maintenance.start()
 
     async def cleanup(self) -> None:
         """Clean up database connections."""
