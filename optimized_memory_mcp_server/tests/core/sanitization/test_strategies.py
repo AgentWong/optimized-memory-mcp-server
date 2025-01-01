@@ -1,6 +1,6 @@
 """Tests for sanitization strategies."""
 import pytest
-from ....core.sanitization.strategies import SQLiteSanitizer
+from optimized_memory_mcp_server.core.sanitization.strategies import SQLiteSanitizer
 
 
 def test_sqlite_sanitizer_string():

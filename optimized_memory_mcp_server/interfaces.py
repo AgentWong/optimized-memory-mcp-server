@@ -2,6 +2,50 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Union, Tuple, Optional
 from datetime import datetime
 import json
+from enum import Enum
+
+class CloudResourceType(Enum):
+    AWS_INSTANCE = "aws_instance"
+    AWS_VPC = "aws_vpc"
+    AWS_SUBNET = "aws_subnet"
+    AWS_SECURITY_GROUP = "aws_security_group"
+    AWS_IAM_ROLE = "aws_iam_role"
+
+@dataclass(frozen=True)
+class CloudResource:
+    resource_id: str
+    resource_type: CloudResourceType
+    region: str
+    account_id: str
+    metadata: Dict[str, Any]
+    entity_name: Optional[str] = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    last_updated: datetime = field(default_factory=datetime.utcnow)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "resource_id": self.resource_id,
+            "resource_type": self.resource_type.value,
+            "region": self.region,
+            "account_id": self.account_id,
+            "metadata": self.metadata,
+            "entity_name": self.entity_name,
+            "created_at": self.created_at.isoformat(),
+            "last_updated": self.last_updated.isoformat()
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'CloudResource':
+        return cls(
+            resource_id=data["resource_id"],
+            resource_type=CloudResourceType(data["resource_type"]),
+            region=data["region"],
+            account_id=data["account_id"],
+            metadata=data["metadata"],
+            entity_name=data.get("entity_name"),
+            created_at=datetime.fromisoformat(data["created_at"]) if "created_at" in data else None,
+            last_updated=datetime.fromisoformat(data["last_updated"]) if "last_updated" in data else None
+        )
 
 @dataclass(frozen=True)
 class Entity:

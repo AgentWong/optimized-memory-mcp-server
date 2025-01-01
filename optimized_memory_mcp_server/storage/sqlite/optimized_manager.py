@@ -11,6 +11,8 @@ from .schema import initialize_schema
 from .operations.entity_ops import EntityOperations
 from .operations.relation_ops import RelationOperations
 from .operations.search_ops import SearchOperations
+from .operations.cloud_ops import CloudResourceOperations
+from ...interfaces import CloudResource, CloudResourceType
 from ...interfaces import Entity, Relation
 from ...exceptions import EntityNotFoundError, EntityAlreadyExistsError
 from .utils.sanitization import sanitize_input as _sanitize_input
@@ -42,6 +44,7 @@ class SQLiteManager(StorageBackend):
         self.entity_ops = EntityOperations(self.pool)
         self.relation_ops = RelationOperations(self.pool)
         self.search_ops = SearchOperations(self.pool)
+        self.cloud_ops = CloudResourceOperations(self.pool)
 
     async def initialize(self) -> None:
         """Initialize database schema."""
@@ -113,3 +116,27 @@ class SQLiteManager(StorageBackend):
     async def open_nodes(self, names: List[str]) -> Dict[str, List[Dict[str, Any]]]:
         """Retrieve specific nodes by name and their relations."""
         return await self.search_ops.open_nodes(names)
+
+    async def create_cloud_resource(self, resource: CloudResource) -> Dict[str, Any]:
+        """Create a new cloud resource record."""
+        return await self.cloud_ops.create_resource(resource)
+
+    async def get_cloud_resources(
+        self,
+        resource_type: CloudResourceType,
+        region: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Retrieve cloud resources by type and optionally region."""
+        return await self.cloud_ops.get_resources_by_type(resource_type, region)
+
+    async def update_cloud_resource(
+        self,
+        resource_id: str,
+        new_metadata: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Update cloud resource metadata and state."""
+        return await self.cloud_ops.update_resource_state(resource_id, new_metadata)
+
+    async def delete_cloud_resource(self, resource_id: str) -> None:
+        """Remove a cloud resource record."""
+        await self.cloud_ops.delete_resource(resource_id)
