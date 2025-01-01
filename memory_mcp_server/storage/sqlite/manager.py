@@ -1,7 +1,6 @@
 """SQLite storage backend implementation."""
-
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from urllib.parse import urlparse
 import os
 from pathlib import Path
@@ -9,27 +8,28 @@ from pathlib import Path
 from ..base import StorageBackend
 from .connection import SQLiteConnectionPool
 from .schema import initialize_schema
+from .operations.entity_ops import EntityOperations
+from .operations.relation_ops import RelationOperations
+from .operations.search_ops import SearchOperations
 from ...interfaces import Entity, Relation
-from ...core.exceptions import EntityNotFoundError, EntityAlreadyExistsError
+from ...exceptions import EntityNotFoundError, EntityAlreadyExistsError
+from .utils.sanitization import sanitize_input as _sanitize_input
 
 logger = logging.getLogger(__name__)
 
-def _sanitize_input(value: str) -> str:
-    """Sanitize input to prevent SQL injection"""
-    return value.replace("'", "''")
-
 class SQLiteStorageBackend(StorageBackend):
+    """SQLite implementation of the storage backend."""
+    
     def __init__(self, database_url: str, echo: bool = False):
         """Initialize SQLite backend with database path extracted from URL."""
         parsed_url = urlparse(database_url)
         if not parsed_url.path:
             raise ValueError("Database path not specified in URL")
             
-        # For absolute paths, keep them as is
+        # Handle absolute and relative paths
         if parsed_url.path.startswith('/'):
             db_path = parsed_url.path
         else:
-            # For relative paths, handle as before
             path = parsed_url.path.lstrip('/')
             if '/' in path:  # If path contains directories
                 db_path = str(Path(path).absolute())
@@ -37,7 +37,11 @@ class SQLiteStorageBackend(StorageBackend):
             else:  # Simple filename in current directory
                 db_path = path
 
+        # Initialize connection pool and operation handlers
         self.pool = SQLiteConnectionPool(db_path, echo=echo)
+        self.entity_ops = EntityOperations(self.pool)
+        self.relation_ops = RelationOperations(self.pool)
+        self.search_ops = SearchOperations(self.pool)
 
     async def initialize(self) -> None:
         """Initialize database schema."""
