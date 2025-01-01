@@ -427,7 +427,7 @@ suggest-shell-commands: false
 #multiline: false
 
 ## Enable/disable detection and offering to add URLs to chat (default: True)
-#detect-urls: true
+detect-urls: false
 
 ## Specify which editor to use for the /editor command
 #editor: vim
